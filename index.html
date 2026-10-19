@@ -1,0 +1,995 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+</head>
+<body>
+<title>LLM-Testbench Scoreboard</title>
+<script>(function(){try{var t=localStorage.getItem('ui-theme');if(t==='light'||t==='dark'){document.documentElement.dataset.theme=t;}}catch(e){}})();</script>
+<style>
+/* Designsystem „Ops Console“ (Auszug aus ui.css): dark-first, Hairlines, LED-Status,
+   Mono für Werte. Schriften: nur System-Stacks, nichts wird nachgeladen. */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0e1114;--s1:#14181c;--s2:#171c21;--s3:#1f262d;
+  --border:#262d35;--border2:#343d47;--hairline:#20262d;
+  --text:#dfe6ec;--t2:#9aa7b2;--t3:#7a8793;
+  --acc:#2dd4bf;--acc-dim:rgba(45,212,191,.10);--acc-glow:rgba(45,212,191,.35);
+  --green:#3fdd78;--green-dim:rgba(63,221,120,.10);--green-glow:rgba(63,221,120,.45);
+  --warn:#ffb224;--warn-dim:rgba(255,178,36,.10);--warn-glow:rgba(255,178,36,.45);
+  --red:#ff5d5d;--red-dim:rgba(255,93,93,.12);--red-glow:rgba(255,93,93,.5);
+  --purple:#b18cff;--purple-dim:rgba(177,140,255,.12);
+  --gray:#6c7884;--gray-dim:rgba(108,120,132,.15);
+  --sans:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI','Helvetica Neue',
+    Arial,sans-serif;
+  --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,'DejaVu Sans Mono',monospace;
+  --fs-0:11px;--fs-1:12px;--fs-2:13px;--fs-3:14px;--fs-4:16px;--fs-5:22px;
+  --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:24px;--sp-6:32px;
+  --r:6px;--r-sm:4px;--touch:48px;
+  color-scheme:dark;
+}
+:root[data-theme="light"]{
+  --bg:#eef1f4;--s1:#ffffff;--s2:#ffffff;--s3:#eef1f4;
+  --border:#d8dde3;--border2:#c2cad2;--hairline:#e4e8ec;
+  --text:#1b2128;--t2:#4d5a66;--t3:#66727d;
+  --acc:#0d9488;--acc-dim:rgba(13,148,136,.10);--acc-glow:rgba(13,148,136,.30);
+  --green:#15803d;--green-dim:rgba(21,163,74,.10);--green-glow:rgba(21,163,74,.40);
+  --warn:#a16207;--warn-dim:rgba(196,125,0,.12);--warn-glow:rgba(196,125,0,.40);
+  --red:#dc2626;--red-dim:rgba(220,38,38,.10);--red-glow:rgba(220,38,38,.45);
+  --purple:#7c5cdb;--purple-dim:rgba(124,92,219,.10);
+  --gray:#7b8794;--gray-dim:rgba(123,135,148,.14);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:light){
+  :root:not([data-theme="dark"]):not([data-theme="light"]){
+    --bg:#eef1f4;--s1:#ffffff;--s2:#ffffff;--s3:#eef1f4;
+    --border:#d8dde3;--border2:#c2cad2;--hairline:#e4e8ec;
+    --text:#1b2128;--t2:#4d5a66;--t3:#66727d;
+    --acc:#0d9488;--acc-dim:rgba(13,148,136,.10);--acc-glow:rgba(13,148,136,.30);
+    --green:#15803d;--green-dim:rgba(21,163,74,.10);--green-glow:rgba(21,163,74,.40);
+    --warn:#a16207;--warn-dim:rgba(196,125,0,.12);--warn-glow:rgba(196,125,0,.40);
+    --red:#dc2626;--red-dim:rgba(220,38,38,.10);--red-glow:rgba(220,38,38,.45);
+    --purple:#7c5cdb;--purple-dim:rgba(124,92,219,.10);
+    --gray:#7b8794;--gray-dim:rgba(123,135,148,.14);
+    color-scheme:light;
+  }
+}
+
+/* ── Basis ── */
+html,body{overflow-x:clip}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:var(--fs-3);
+  line-height:1.45;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  touch-action:manipulation;min-height:100vh}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(1100px 520px at 72% -12%, var(--acc-dim), transparent 62%),
+    repeating-linear-gradient(0deg, transparent 0 31px, rgba(127,134,148,.05) 31px 32px)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+code{font-family:var(--mono);font-size:.92em;background:var(--s3);padding:1px 5px;
+  border-radius:4px}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--t3)}
+
+/* ── Topbar ── */
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;flex-wrap:wrap;
+  gap:var(--sp-2);min-height:56px;
+  padding:4px max(16px,env(safe-area-inset-right)) 4px max(16px,env(safe-area-inset-left));
+  background:var(--s1);border-bottom:1px solid var(--border)}
+.tlogo{display:flex;align-items:center;gap:10px;font-size:var(--fs-2);font-weight:700;
+  letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.tchip{font-family:var(--mono);font-size:var(--fs-0);padding:3px 9px;border-radius:var(--r-sm);
+  border:1px solid var(--border);color:var(--t2);background:var(--s3);white-space:nowrap}
+.tchip b{color:var(--text);font-weight:600}
+.tbar-tools{display:flex;align-items:center;gap:var(--sp-2);margin-left:auto}
+.tbtn{display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  min-width:var(--touch);min-height:var(--touch);padding:0 10px;background:transparent;
+  border:1px solid var(--border);border-radius:var(--r-sm);color:var(--t2);cursor:pointer;
+  font-size:var(--fs-2);line-height:1}
+.tbtn .ico{font-size:18px}
+@media (hover:hover){.tbtn:hover{background:var(--s3);color:var(--text)}}
+
+/* ── Seitenrahmen ── */
+.page{position:relative;z-index:1;max-width:1320px;margin:0 auto;display:grid;
+  gap:var(--sp-4);
+  padding:var(--sp-4) max(16px,env(safe-area-inset-right))
+    calc(var(--sp-6) + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+.page>*{min-width:0}
+.intro h1{font-size:var(--fs-5);font-weight:650;line-height:1.2;letter-spacing:-.01em}
+.intro p{color:var(--t2);max-width:72ch;margin-top:var(--sp-1)}
+
+/* ── LED ── */
+.led{display:inline-block;width:9px;height:9px;border-radius:50%;flex-shrink:0;
+  background:var(--gray)}
+.led-acc{background:var(--acc);box-shadow:0 0 7px 1px var(--acc-glow)}
+
+/* ── KPI-Leiste ── */
+.kpis{display:flex;flex-wrap:wrap;background:var(--s2);border:1px solid var(--border);
+  border-radius:var(--r);overflow:hidden}
+.kpi{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:1px;padding:9px 16px;
+  border-right:1px solid var(--hairline)}
+.kpi:last-child{border-right:none}
+.kpi-label{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi-val{font-family:var(--mono);font-size:18px;font-weight:600;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.kpi-val.small{font-size:var(--fs-3);white-space:normal}
+.kpi-val.ok{color:var(--green)}.kpi-val.warn{color:var(--warn)}.kpi-val.crit{color:var(--red)}
+@media (max-width:860px){
+  .kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kpi{border-right:none;border-bottom:1px solid var(--hairline);padding:8px 12px}
+  .kpi:nth-child(odd){border-right:1px solid var(--hairline)}
+  .kpi:nth-last-child(-n+2):nth-child(odd),.kpi:last-child{border-bottom:none}
+}
+
+/* ── Panel ── */
+.card{background:var(--s2);border:1px solid var(--border);border-radius:var(--r);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025);min-width:0}
+:root[data-theme="light"] .card{box-shadow:0 1px 2px rgba(20,30,40,.05)}
+.card-head{display:flex;align-items:center;flex-wrap:wrap;gap:var(--sp-2);padding:9px 14px;
+  border-bottom:1px solid var(--hairline);min-height:44px}
+.card-head h2{font-size:var(--fs-0);font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--t2)}
+.card-head .sub{font-size:var(--fs-1);color:var(--t3)}
+.card-body{padding:var(--sp-3) var(--sp-4)}
+.card-body.flush{padding:0}
+@media (max-width:860px){
+  .card-head .sub{flex-basis:100%}
+  .card-body{padding:var(--sp-3)}
+}
+
+/* ── Pills (LED + Text) ── */
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-0);font-weight:600;
+  padding:2px 8px;border-radius:var(--r-sm);white-space:nowrap;border:1px solid var(--border);
+  background:var(--s3);color:var(--t2);max-width:100%}
+.pill::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--gray);
+  flex-shrink:0}
+.pill.no-dot::before{display:none}
+.pill-ok{color:var(--green);border-color:color-mix(in srgb,var(--green) 30%,transparent)}
+.pill-ok::before{background:var(--green);box-shadow:0 0 5px var(--green-glow)}
+.pill-warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 35%,transparent)}
+.pill-warn::before{background:var(--warn);box-shadow:0 0 5px var(--warn-glow)}
+.pill-crit{color:var(--red);border-color:color-mix(in srgb,var(--red) 40%,transparent)}
+.pill-crit::before{background:var(--red);box-shadow:0 0 6px var(--red-glow)}
+.pill-info{color:var(--acc);border-color:color-mix(in srgb,var(--acc) 30%,transparent)}
+.pill-info::before{background:var(--acc);box-shadow:0 0 5px var(--acc-glow)}
+.pill-purple{color:var(--purple);border-color:color-mix(in srgb,var(--purple) 35%,transparent)}
+.pill-purple::before{background:var(--purple)}
+.pill-endpoint{font-family:var(--mono);font-weight:500}
+
+/* ── Filterleiste ── */
+.toolbar{display:grid;gap:var(--sp-3)}
+.toolbar-row{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2)}
+.toolbar-label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--t3);flex-basis:100%}
+.chip{display:inline-flex;align-items:center;gap:8px;min-height:var(--touch);padding:0 14px;
+  border:1px solid var(--border2);border-radius:var(--r-sm);background:var(--s3);
+  color:var(--t2);font-family:var(--mono);font-size:var(--fs-2);font-weight:500;
+  cursor:pointer;white-space:nowrap}
+.chip::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--gray);
+  flex-shrink:0}
+.chip[aria-pressed="true"]{color:var(--acc);background:var(--acc-dim);
+  border-color:color-mix(in srgb,var(--acc) 45%,transparent)}
+.chip[aria-pressed="true"]::before{background:var(--acc);box-shadow:0 0 6px var(--acc-glow)}
+.chip.plain{font-family:var(--sans)}
+.chip.plain::before{display:none}
+@media (hover:hover){.chip:hover{border-color:var(--t3);color:var(--text)}}
+.switch{display:inline-flex;align-items:center;gap:12px;min-height:var(--touch);
+  padding:0 14px 0 10px;border:1px solid var(--border2);border-radius:var(--r-sm);
+  background:var(--s3);color:var(--text);cursor:pointer;font-size:var(--fs-2);
+  text-align:left;max-width:100%}
+.switch-track{position:relative;width:38px;height:22px;border-radius:11px;flex-shrink:0;
+  background:var(--border2)}
+.switch-track::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;
+  border-radius:50%;background:var(--t2)}
+.switch[aria-pressed="true"] .switch-track{background:var(--acc)}
+.switch[aria-pressed="true"] .switch-track::after{left:19px;background:#08211d}
+.seg{display:inline-flex;background:var(--s3);border:1px solid var(--border2);
+  border-radius:var(--r-sm);padding:2px;max-width:100%}
+.seg-btn{min-height:44px;padding:0 14px;background:transparent;border:none;border-radius:3px;
+  color:var(--t2);font-size:var(--fs-2);font-weight:600;cursor:pointer;white-space:nowrap}
+.seg-btn[aria-pressed="true"]{background:var(--acc);color:#08211d}
+.toolbar-sort{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2)}
+.toolbar-sort>span{font-size:var(--fs-2);color:var(--t2)}
+
+/* ── Tabelle (dicht) ── */
+.tbl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--t3);text-align:left;padding:8px 14px;border-bottom:1px solid var(--border);
+  white-space:nowrap;background:var(--s1)}
+.tbl th[aria-sort]{color:var(--acc)}
+.tbl th[aria-sort="descending"]::after{content:' ↓'}
+.tbl th[aria-sort="ascending"]::after{content:' ↑'}
+.tbl td{padding:10px 14px;border-bottom:1px solid var(--hairline);font-size:var(--fs-2);
+  vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl .right{text-align:right}
+.tbl td.num{white-space:nowrap}
+
+/* ── Rangliste ── */
+.rank-cell{width:3.5em}
+.rank{font-family:var(--mono);font-size:var(--fs-4);font-weight:700;color:var(--t3)}
+.rank.first{color:var(--acc)}
+.model-prefix{display:block;font-family:var(--mono);font-size:var(--fs-0);color:var(--t3);
+  overflow-wrap:anywhere}
+.model-name{display:block;font-weight:600;font-size:var(--fs-3);overflow-wrap:anywhere}
+.model-meta{display:flex;flex-wrap:wrap;gap:4px 6px;margin-top:6px}
+.model-cell{min-width:220px;max-width:340px}
+.score-line{display:flex;align-items:center;gap:10px;white-space:nowrap}
+.score-value{font-family:var(--mono);font-size:var(--fs-4);font-weight:700;min-width:3.6em;
+  font-variant-numeric:tabular-nums}
+.score-value.ok{color:var(--green)}.score-value.mid{color:var(--warn)}
+.score-value.low{color:var(--red)}.score-value.none{color:var(--t3)}
+.score-detail{margin-top:4px;font-family:var(--mono);font-size:var(--fs-0);color:var(--t3)}
+.meter{height:10px;width:100%;min-width:60px;max-width:140px;flex:1 1 auto;
+  background:var(--s3);border:1px solid var(--hairline);border-radius:2px;overflow:hidden;
+  position:relative}
+.meter>i{display:block;height:100%;background:var(--gray)}
+.meter::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(90deg,transparent 0 5px,var(--s2) 5px 6px)}
+.meter.ok>i{background:var(--green)}.meter.mid>i{background:var(--warn)}
+.meter.low>i{background:var(--red)}
+.suite-cells{display:flex;flex-wrap:wrap;gap:4px;min-width:200px}
+.suite-cell{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-width:58px;padding:3px 6px;border-radius:var(--r-sm);border:1px solid transparent;
+  font-family:var(--mono);line-height:1.2}
+.suite-cell small{font-size:9px;letter-spacing:.04em;text-transform:uppercase;opacity:.85;
+  max-width:9em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.suite-cell b{font-size:var(--fs-1);font-weight:600}
+.state-pass{background:var(--green-dim);color:var(--green);
+  border-color:color-mix(in srgb,var(--green) 30%,transparent)}
+.state-part{background:var(--warn-dim);color:var(--warn);
+  border-color:color-mix(in srgb,var(--warn) 35%,transparent)}
+.state-fail{background:var(--red-dim);color:var(--red);
+  border-color:color-mix(in srgb,var(--red) 40%,transparent)}
+.state-skip,.state-absent{background:var(--gray-dim);color:var(--t3);
+  border-color:var(--hairline)}
+.state-absent{background:transparent;border-style:dashed}
+
+/* Rangliste < 700 px: Tabelle wird zur Kartenliste */
+@media (max-width:699.98px){
+  .tbl-stack,.tbl-stack tbody{display:block;width:100%}
+  .tbl-stack thead{display:none}
+  .tbl-stack tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px;
+    padding:12px 14px;border-bottom:1px solid var(--hairline)}
+  .tbl-stack tr:last-child{border-bottom:none}
+  .tbl-stack td{display:block;padding:0;border-bottom:none;min-width:0;max-width:none;
+    width:auto}
+  .tbl-stack td.span-2{grid-column:span 2}
+  .tbl-stack td.right{text-align:left}
+  .tbl-stack td[data-label]::before{content:attr(data-label);display:block;font-size:9px;
+    font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;
+    margin-bottom:3px}
+  .tbl-stack td.rank-model{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;
+    align-items:start}
+  .tbl-stack td.rank-model .rank{font-size:var(--fs-5);line-height:1}
+  .tbl-stack .suite-cells{min-width:0;display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(64px,1fr))}
+  .tbl-stack .suite-cell{min-width:0}
+  .tbl-stack .meter{max-width:none}
+  .tbl-stack td.rank-cell-desktop{display:none}
+}
+@media (min-width:700px){.rank-inline{display:none}}
+@media (max-width:699.98px){
+  .topbar .tchip{display:none}
+  .matrix .case-col{width:112px;min-width:100px;max-width:120px;padding:6px 8px}
+}
+
+/* ── Matrix ── */
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;padding:var(--sp-3) var(--sp-4);
+  border-bottom:1px solid var(--hairline);font-size:var(--fs-1);color:var(--t2)}
+.legend-item{display:inline-flex;align-items:center;gap:6px}
+.legend .suite-cell{min-width:40px;padding:2px 6px}
+.matrix{border-collapse:separate;border-spacing:0;min-width:100%}
+.matrix th,.matrix td{border-bottom:1px solid var(--hairline);padding:4px;text-align:center;
+  vertical-align:middle;background:var(--s2)}
+.matrix thead th{position:sticky;top:0;background:var(--s1);
+  border-bottom:1px solid var(--border);vertical-align:bottom;padding:8px 4px}
+.matrix .case-col{position:sticky;left:0;z-index:2;text-align:left;
+  border-right:1px solid var(--border);padding:6px 10px;width:150px;min-width:120px;
+  max-width:170px}
+.matrix thead .case-col{z-index:3;font-size:10px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--t3)}
+.matrix td.case-col{font-family:var(--mono);font-size:var(--fs-1);color:var(--text);
+  overflow-wrap:anywhere;line-height:1.3}
+.run-head{min-width:76px;max-width:120px;font-weight:500;text-align:center}
+.run-head .run-rank{display:block;font-family:var(--mono);font-size:var(--fs-2);
+  font-weight:700;color:var(--acc)}
+.run-head .run-name{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;
+  overflow:hidden;font-size:10px;line-height:1.25;color:var(--text);overflow-wrap:anywhere}
+.run-head .run-mode{display:block;margin-top:2px;font-family:var(--mono);font-size:9px;
+  color:var(--t3);overflow-wrap:anywhere}
+.matrix tr.suite-row td{background:var(--s1);text-align:left;padding:0;
+  border-bottom:1px solid var(--border)}
+.suite-row-label{position:sticky;left:0;display:inline-flex;align-items:center;gap:8px;
+  padding:7px 10px;font-size:10px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--t2)}
+.cell-btn{display:inline-flex;align-items:center;justify-content:center;
+  min-width:var(--touch);min-height:var(--touch);width:100%;max-width:72px;
+  border-radius:var(--r-sm);border:1px solid transparent;font-family:var(--mono);
+  font-size:var(--fs-2);font-weight:600;cursor:pointer;font-variant-numeric:tabular-nums}
+span.cell-btn{cursor:default}
+.cell-btn[aria-pressed="true"]{outline:2px solid var(--acc);outline-offset:1px;
+  box-shadow:0 0 10px var(--acc-glow)}
+
+/* ── Detailfeld ── */
+.detail{scroll-margin-top:72px}
+.detail-empty{color:var(--t2);font-size:var(--fs-2)}
+.detail-title{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:10px}
+.detail-title h3{font-size:var(--fs-4);font-weight:600;overflow-wrap:anywhere}
+.detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:8px 16px;margin-bottom:12px}
+.detail-grid dt{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--t3)}
+.detail-grid dd{font-family:var(--mono);font-size:var(--fs-1);overflow-wrap:anywhere}
+.notes-title{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--t3);margin-bottom:6px}
+.notes{list-style:none;display:grid;gap:6px}
+.notes li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;
+  padding:8px 10px;background:var(--s3);border:1px solid var(--hairline);
+  border-radius:var(--r-sm)}
+.notes .note-index{font-family:var(--mono);font-size:var(--fs-0);color:var(--t3);
+  padding-top:2px;white-space:nowrap}
+.notes .note-text{font-family:var(--mono);font-size:var(--fs-1);white-space:pre-wrap;
+  overflow-wrap:anywhere}
+.detail-actions{margin-top:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  min-height:var(--touch);padding:0 16px;border:1px solid var(--border2);
+  border-radius:var(--r-sm);background:var(--s3);color:var(--text);font-size:var(--fs-2);
+  font-weight:500;cursor:pointer;white-space:nowrap}
+@media (hover:hover){.btn:hover{border-color:var(--t3)}}
+.empty{padding:var(--sp-5) var(--sp-4);color:var(--t2)}
+.footer{font-size:var(--fs-1);color:var(--t3);text-align:center}
+
+/* ── Bewegung nur, wenn erwünscht ── */
+@media (prefers-reduced-motion:no-preference){
+  body{transition:background-color .15s ease,color .15s ease}
+  .meter>i{transition:width .3s ease}
+  .switch-track::after{transition:left .15s ease}
+  .page>*{animation:rise .32s ease backwards}
+  .page>*:nth-child(2){animation-delay:.05s}
+  .page>*:nth-child(3){animation-delay:.1s}
+  .page>*:nth-child(4){animation-delay:.15s}
+  .page>*:nth-child(5){animation-delay:.2s}
+}
+@keyframes rise{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+</style>
+
+<header class="topbar">
+  <div class="tlogo"><span class="led led-acc" aria-hidden="true"></span>LLM-Testbench</div>
+  <div class="tbar-tools">
+    <span class="tchip">Stand <b id="stand-chip-value">–</b></span>
+    <button class="tbtn" id="theme-toggle" type="button" aria-label="Design umschalten">
+      <span class="ico" aria-hidden="true">◐</span><span class="theme-label">Design</span>
+    </button>
+  </div>
+</header>
+
+<main class="page">
+  <section class="intro" aria-labelledby="page-title">
+    <h1 id="page-title">Scoreboard</h1>
+    <p>Alle Modelle bekommen dieselben Testfälle mit maschinell geprüfter Lösung.
+      Der Score ist der Anteil bestandener Läufe der gewählten Suites; Fälle, die am
+      Endpunkt nicht möglich sind (–), zählen nicht.</p>
+  </section>
+
+  <div class="kpis" id="kpis" aria-label="Kennzahlen"></div>
+
+  <section class="card" aria-labelledby="filter-title">
+    <div class="card-head"><h2 id="filter-title">Auswahl</h2></div>
+    <div class="card-body toolbar">
+      <div class="toolbar-row" role="group" aria-labelledby="suite-filter-label">
+        <span class="toolbar-label" id="suite-filter-label">Suites</span>
+        <div class="toolbar-row" id="suite-filter"></div>
+      </div>
+      <div class="toolbar-row">
+        <button class="switch" id="latest-only" type="button" aria-pressed="true">
+          <span class="switch-track" aria-hidden="true"></span>
+          <span>nur neuester Lauf je Modell und Modus</span>
+        </button>
+        <div class="toolbar-sort" role="group" aria-labelledby="sort-label">
+          <span id="sort-label">Sortieren nach</span>
+          <div class="seg" id="sort-control">
+            <button class="seg-btn" type="button" data-sort="score">Score</button>
+            <button class="seg-btn" type="button" data-sort="speed">Tempo</button>
+            <button class="seg-btn" type="button" data-sort="duration">Dauer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="ranking-title">
+    <div class="card-head">
+      <h2 id="ranking-title">Rangliste</h2>
+      <span class="sub">Score = bestandene / ausgeführte Läufe · tok/s = Ausgabe-Tokens je
+        Sekunde</span>
+    </div>
+    <div class="card-body flush">
+      <p class="empty" id="empty-state" hidden>Noch keine Läufe vorhanden. Einen Lauf startet
+        <code>uv run llm-testbench run -m &lt;modell&gt;</code>.</p>
+      <div class="tbl-scroll" id="ranking-wrap">
+        <table class="tbl tbl-stack" id="ranking"></table>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="matrix-card" aria-labelledby="matrix-title">
+    <div class="card-head">
+      <h2 id="matrix-title">Wie hat welches Modell abgeschlossen</h2>
+      <span class="sub">Zeilen = Testfälle je Suite, Spalten = Läufe in Ranglisten-Reihenfolge.
+        Zelle antippen für Details.</span>
+    </div>
+    <div class="legend" aria-label="Legende">
+      <span class="legend-item"><span class="suite-cell state-pass">3/3</span>bestanden</span>
+      <span class="legend-item"><span class="suite-cell state-part">1/3</span>teilweise</span>
+      <span class="legend-item"><span class="suite-cell state-fail">0/3</span>durchgefallen</span>
+      <span class="legend-item"><span class="suite-cell state-skip">–</span>am Endpunkt nicht
+        möglich</span>
+      <span class="legend-item"><span class="suite-cell state-absent">·</span>nicht im
+        Lauf</span>
+    </div>
+    <div class="tbl-scroll matrix-scroll" tabindex="0" aria-label="Matrix, seitlich scrollbar">
+      <table class="matrix" id="matrix"></table>
+    </div>
+  </section>
+
+  <section class="card detail" id="detail" aria-labelledby="detail-title" aria-live="polite">
+    <div class="card-head"><h2 id="detail-title">Details zur gewählten Zelle</h2></div>
+    <div class="card-body" id="detail-body"></div>
+  </section>
+
+  <p class="footer">Statische Seite, erzeugt von llm-testbench. Zeiten in UTC.</p>
+</main>
+
+<script type="application/json" id="benchmark-results">[{"model": "openai/unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q8_K_XL", "endpoint": "litellm", "thinking": "default", "repetitions": 1, "started_at": "2026-10-19T18:06:18+00:00", "duration_seconds": 110.9, "cases": [{"suite": "smoke", "case": "bereit", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 1.52, "completion_tokens": 44}, {"suite": "instruct", "case": "drei_stichpunkte", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 2.67, "completion_tokens": 142}, {"suite": "instruct", "case": "wortlimit", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 5.55, "completion_tokens": 397}, {"suite": "instruct", "case": "nur_englisch", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 1.41, "completion_tokens": 80}, {"suite": "reasoning", "case": "schlaeger_ball", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 5.74, "completion_tokens": 493}, {"suite": "reasoning", "case": "buchstaben_zaehlen", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 2.97, "completion_tokens": 183}, {"suite": "reasoning", "case": "wochentag", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 4.48, "completion_tokens": 360}, {"suite": "reasoning", "case": "lagerbestand", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 3.76, "completion_tokens": 355}, {"suite": "json", "case": "ticket_extraktion", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 6.96, "completion_tokens": 553}, {"suite": "json", "case": "reines_array", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 1.91, "completion_tokens": 108}, {"suite": "tools", "case": "wetter", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 1.5, "completion_tokens": 66}, {"suite": "tools", "case": "rechner", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 2.7, "completion_tokens": 199}, {"suite": "tools", "case": "uebersetzung_ohne_tool", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 0.84, "completion_tokens": 30}, {"suite": "tools", "case": "begruessung_ohne_tool", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 1.96, "completion_tokens": 97}, {"suite": "agent", "case": "wetter_vergleich", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["2 Aufrufe"], "average_seconds": 4.06, "completion_tokens": 257}, {"suite": "agent", "case": "abhaengige_kette", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["2 Aufrufe"], "average_seconds": 6.8, "completion_tokens": 398}, {"suite": "code", "case": "roman_to_int", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["alle Asserts bestanden"], "average_seconds": 12.8, "completion_tokens": 1145}, {"suite": "code", "case": "merge_intervals", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["alle Asserts bestanden"], "average_seconds": 6.1, "completion_tokens": 499}, {"suite": "longctx", "case": "needle_anfang", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 7.77, "completion_tokens": 218}, {"suite": "longctx", "case": "needle_mitte", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 7.01, "completion_tokens": 131}, {"suite": "longctx", "case": "needle_ende", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 8.53, "completion_tokens": 265}, {"suite": "perf", "case": "durchsatz", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["701 Tokens, 50.9 tok/s gesamt, 55.5 tok/s Decode, Draft-Akzeptanz 85%"], "average_seconds": 13.78, "completion_tokens": 701}], "suite_summary": {"smoke": {"passed": 1, "total": 1}, "instruct": {"passed": 3, "total": 3}, "reasoning": {"passed": 4, "total": 4}, "json": {"passed": 2, "total": 2}, "tools": {"passed": 4, "total": 4}, "agent": {"passed": 2, "total": 2}, "code": {"passed": 2, "total": 2}, "longctx": {"passed": 3, "total": 3}, "perf": {"passed": 1, "total": 1}}}, {"model": "opencode/deepseek-v4.1-flash-free", "endpoint": "opencode", "thinking": "default", "repetitions": 1, "started_at": "2026-10-19T18:06:18+00:00", "duration_seconds": 125.9, "cases": [{"suite": "smoke", "case": "bereit", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 5.42, "completion_tokens": 1}, {"suite": "instruct", "case": "drei_stichpunkte", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 7.52, "completion_tokens": 69}, {"suite": "instruct", "case": "wortlimit", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 7.36, "completion_tokens": 24}, {"suite": "instruct", "case": "nur_englisch", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 6.94, "completion_tokens": 55}, {"suite": "reasoning", "case": "schlaeger_ball", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 7.92, "completion_tokens": 55}, {"suite": "reasoning", "case": "buchstaben_zaehlen", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 6.47, "completion_tokens": 23}, {"suite": "reasoning", "case": "wochentag", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 6.68, "completion_tokens": 59}, {"suite": "reasoning", "case": "lagerbestand", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 7.98, "completion_tokens": 44}, {"suite": "json", "case": "ticket_extraktion", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 6.16, "completion_tokens": 42}, {"suite": "json", "case": "reines_array", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 7.48, "completion_tokens": 4}, {"suite": "tools", "case": "wetter", "passed_runs": 0, "runs": 0, "skipped_runs": 1, "notes": ["uebersprungen: eigene Tool-Definitionen nicht moeglich"], "average_seconds": 0.0, "completion_tokens": 0}, {"suite": "tools", "case": "rechner", "passed_runs": 0, "runs": 0, "skipped_runs": 1, "notes": ["uebersprungen: eigene Tool-Definitionen nicht moeglich"], "average_seconds": 0.0, "completion_tokens": 0}, {"suite": "tools", "case": "uebersetzung_ohne_tool", "passed_runs": 0, "runs": 0, "skipped_runs": 1, "notes": ["uebersprungen: eigene Tool-Definitionen nicht moeglich"], "average_seconds": 0.0, "completion_tokens": 0}, {"suite": "tools", "case": "begruessung_ohne_tool", "passed_runs": 0, "runs": 0, "skipped_runs": 1, "notes": ["uebersprungen: eigene Tool-Definitionen nicht moeglich"], "average_seconds": 0.0, "completion_tokens": 0}, {"suite": "agent", "case": "wetter_vergleich", "passed_runs": 0, "runs": 0, "skipped_runs": 1, "notes": ["uebersprungen: eigene Tool-Definitionen nicht moeglich"], "average_seconds": 0.0, "completion_tokens": 0}, {"suite": "agent", "case": "abhaengige_kette", "passed_runs": 0, "runs": 0, "skipped_runs": 1, "notes": ["uebersprungen: eigene Tool-Definitionen nicht moeglich"], "average_seconds": 0.0, "completion_tokens": 0}, {"suite": "code", "case": "roman_to_int", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["alle Asserts bestanden"], "average_seconds": 8.75, "completion_tokens": 315}, {"suite": "code", "case": "merge_intervals", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["alle Asserts bestanden"], "average_seconds": 7.72, "completion_tokens": 112}, {"suite": "longctx", "case": "needle_anfang", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 12.72, "completion_tokens": 3}, {"suite": "longctx", "case": "needle_mitte", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 9.12, "completion_tokens": 3}, {"suite": "longctx", "case": "needle_ende", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 6.15, "completion_tokens": 3}, {"suite": "perf", "case": "durchsatz", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["592 Tokens, 51.8 tok/s gesamt"], "average_seconds": 11.42, "completion_tokens": 592}], "suite_summary": {"smoke": {"passed": 1, "total": 1}, "instruct": {"passed": 3, "total": 3}, "reasoning": {"passed": 4, "total": 4}, "json": {"passed": 2, "total": 2}, "code": {"passed": 2, "total": 2}, "longctx": {"passed": 3, "total": 3}, "perf": {"passed": 1, "total": 1}}}, {"model": "openai/unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q8_K_XL", "endpoint": "litellm", "thinking": "default", "repetitions": 1, "started_at": "2026-10-19T18:14:50+00:00", "duration_seconds": 2.9, "cases": [{"suite": "smoke", "case": "bereit", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 0.36, "completion_tokens": 44}, {"suite": "tools", "case": "wetter", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 0.16, "completion_tokens": 66}, {"suite": "tools", "case": "rechner", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 0.22, "completion_tokens": 199}, {"suite": "tools", "case": "uebersetzung_ohne_tool", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 0.37, "completion_tokens": 30}, {"suite": "tools", "case": "begruessung_ohne_tool", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 0.25, "completion_tokens": 97}, {"suite": "agent", "case": "wetter_vergleich", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["2 Aufrufe"], "average_seconds": 0.7, "completion_tokens": 257}, {"suite": "agent", "case": "abhaengige_kette", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["2 Aufrufe"], "average_seconds": 0.87, "completion_tokens": 398}], "suite_summary": {"smoke": {"passed": 1, "total": 1}, "tools": {"passed": 4, "total": 4}, "agent": {"passed": 2, "total": 2}}}, {"model": "opencode/deepseek-v4.1-flash-free", "endpoint": "opencode", "thinking": "default", "repetitions": 1, "started_at": "2026-10-19T18:24:45+00:00", "duration_seconds": 24.2, "cases": [{"suite": "smoke", "case": "bereit", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 2.44, "completion_tokens": 1}, {"suite": "reasoning", "case": "schlaeger_ball", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 3.66, "completion_tokens": 62}, {"suite": "reasoning", "case": "buchstaben_zaehlen", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 2.29, "completion_tokens": 27}, {"suite": "reasoning", "case": "wochentag", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 5.08, "completion_tokens": 62}, {"suite": "reasoning", "case": "lagerbestand", "passed_runs": 1, "runs": 1, "skipped_runs": 0, "notes": ["ok"], "average_seconds": 10.71, "completion_tokens": 49}], "suite_summary": {"smoke": {"passed": 1, "total": 1}, "reasoning": {"passed": 4, "total": 4}}}]</script>
+<script>
+(function () {
+  "use strict";
+
+  /* ── Hilfsfunktionen: DOM nur über textContent/setAttribute, nie als HTML-String ── */
+  function buildElement(tagName, properties, children) {
+    const element = document.createElement(tagName);
+    Object.entries(properties || {}).forEach(([name, value]) => {
+      if (value === null || value === undefined || value === false) return;
+      if (name === "className") element.className = value;
+      else if (name === "text") element.textContent = String(value);
+      else if (name.startsWith("on")) element.addEventListener(name.slice(2), value);
+      else element.setAttribute(name, value === true ? "" : String(value));
+    });
+    (children || []).forEach(child => {
+      if (child === null || child === undefined || child === false) return;
+      element.append(child instanceof Node ? child : String(child));
+    });
+    return element;
+  }
+  function replaceChildrenOf(element, children) {
+    element.replaceChildren(...children.filter(Boolean));
+  }
+  function storeValue(key, value) {
+    try { localStorage.setItem(key, value); } catch (error) { /* privat/blockiert */ }
+  }
+  const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+  const decimalFormatters = new Map();
+  function formatDecimal(value, fractionDigits) {
+    if (!decimalFormatters.has(fractionDigits)) {
+      decimalFormatters.set(fractionDigits, new Intl.NumberFormat("de-DE", {
+        minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits,
+      }));
+    }
+    return decimalFormatters.get(fractionDigits).format(value);
+  }
+  function formatDuration(seconds) {
+    if (!Number.isFinite(seconds) || seconds < 0) return "–";
+    if (seconds < 60) return formatDecimal(seconds, 1) + " s";
+    const rounded = Math.round(seconds);
+    const hours = Math.floor(rounded / 3600);
+    const minutes = Math.floor((rounded % 3600) / 60);
+    const rest = rounded % 60;
+    if (hours) return hours + " h " + String(minutes).padStart(2, "0") + " min";
+    return minutes + " min " + String(rest).padStart(2, "0") + " s";
+  }
+  function formatTimestamp(isoText) {
+    const date = new Date(isoText);
+    if (Number.isNaN(date.getTime())) return isoText || "–";
+    const twoDigits = number => String(number).padStart(2, "0");
+    return twoDigits(date.getUTCDate()) + "." + twoDigits(date.getUTCMonth() + 1) + "."
+      + date.getUTCFullYear() + ", " + twoDigits(date.getUTCHours()) + ":"
+      + twoDigits(date.getUTCMinutes()) + " UTC";
+  }
+  function timestampValue(isoText) {
+    const value = new Date(isoText).getTime();
+    return Number.isNaN(value) ? 0 : value;
+  }
+
+  /* ── Daten einlesen und absichern (Werte sind nicht vertrauenswürdig) ── */
+  function readNumber(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : 0;
+  }
+  function normalizeCase(rawCase) {
+    const source = rawCase && typeof rawCase === "object" ? rawCase : {};
+    return {
+      suite: String(source.suite ?? "?"),
+      caseName: String(source.case ?? "?"),
+      passedRuns: readNumber(source.passed_runs),
+      runs: readNumber(source.runs),
+      skippedRuns: readNumber(source.skipped_runs),
+      notes: Array.isArray(source.notes) ? source.notes.map(note => String(note)) : [],
+      averageSeconds: readNumber(source.average_seconds),
+      completionTokens: readNumber(source.completion_tokens),
+    };
+  }
+  function normalizeRun(rawRun, index) {
+    const source = rawRun && typeof rawRun === "object" ? rawRun : {};
+    return {
+      runId: index,
+      model: String(source.model ?? "unbekannt"),
+      endpoint: String(source.endpoint ?? "?"),
+      thinking: String(source.thinking ?? "default"),
+      repetitions: readNumber(source.repetitions),
+      startedAt: String(source.started_at ?? ""),
+      durationSeconds: readNumber(source.duration_seconds),
+      cases: Array.isArray(source.cases) ? source.cases.map(normalizeCase) : [],
+    };
+  }
+  function loadEmbeddedRuns() {
+    try {
+      const parsed = JSON.parse(document.getElementById("benchmark-results").textContent);
+      return Array.isArray(parsed) ? parsed.map(normalizeRun) : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  const allRuns = loadEmbeddedRuns();
+  const suiteOrder = [];
+  allRuns.forEach(run => run.cases.forEach(caseResult => {
+    if (!suiteOrder.includes(caseResult.suite)) suiteOrder.push(caseResult.suite);
+  }));
+  const viewState = {
+    activeSuites: new Set(suiteOrder),
+    latestOnly: true,
+    sortKey: "score",
+    selectedCell: null,
+  };
+
+  const thinkingLabels = { default: "Standard", on: "an", off: "aus" };
+  const verdictLabels = {
+    pass: "bestanden", part: "teilweise bestanden", fail: "durchgefallen",
+    skip: "am Endpunkt nicht möglich", absent: "nicht im Lauf enthalten",
+  };
+  const pillClassForState = {
+    pass: "pill pill-ok", part: "pill pill-warn", fail: "pill pill-crit",
+    skip: "pill", absent: "pill",
+  };
+
+  function describeThinking(thinking) {
+    return thinkingLabels[thinking] || thinking;
+  }
+  function determineState(passedRuns, runs) {
+    if (!runs) return "skip";
+    if (passedRuns >= runs) return "pass";
+    return passedRuns > 0 ? "part" : "fail";
+  }
+  function determineScoreLevel(ratio) {
+    if (ratio === null) return "none";
+    if (ratio >= 0.9) return "ok";
+    return ratio >= 0.6 ? "mid" : "low";
+  }
+  function splitModelName(model) {
+    const slashIndex = model.lastIndexOf("/");
+    if (slashIndex < 0) return { prefix: "", name: model };
+    return { prefix: model.slice(0, slashIndex + 1), name: model.slice(slashIndex + 1) };
+  }
+  function buildThinkingPill(thinking) {
+    const pillClass = thinking === "on" ? "pill pill-purple"
+      : thinking === "off" ? "pill" : "pill no-dot";
+    return buildElement("span", { className: pillClass, text: "Denken: "
+      + describeThinking(thinking) });
+  }
+  function buildEndpointPill(endpoint) {
+    return buildElement("span", { className: "pill pill-info pill-endpoint", text: endpoint });
+  }
+
+  /* ── Auswahl und Bewertung ── */
+  function selectVisibleRuns() {
+    const chronological = [...allRuns].sort(
+      (first, second) => timestampValue(first.startedAt) - timestampValue(second.startedAt));
+    if (!viewState.latestOnly) return chronological;
+    const latestBySetup = new Map();
+    chronological.forEach(run => {
+      latestBySetup.set(JSON.stringify([run.model, run.endpoint, run.thinking]), run);
+    });
+    return [...latestBySetup.values()];
+  }
+  function scoreRun(run) {
+    let passed = 0, total = 0, executedCases = 0, selectedCases = 0;
+    let seconds = 0, tokens = 0;
+    const suiteCounts = new Map();
+    run.cases.forEach(caseResult => {
+      if (!viewState.activeSuites.has(caseResult.suite)) return;
+      selectedCases += 1;
+      if (!suiteCounts.has(caseResult.suite)) {
+        suiteCounts.set(caseResult.suite, { passed: 0, total: 0 });
+      }
+      if (!caseResult.runs) return;
+      const counts = suiteCounts.get(caseResult.suite);
+      counts.passed += caseResult.passedRuns;
+      counts.total += caseResult.runs;
+      executedCases += 1;
+      passed += caseResult.passedRuns;
+      total += caseResult.runs;
+      seconds += caseResult.averageSeconds * caseResult.runs;
+      tokens += caseResult.completionTokens;
+    });
+    return {
+      run, passed, total, executedCases, selectedCases, suiteCounts,
+      ratio: total ? passed / total : null,
+      tokensPerSecond: seconds > 0 && tokens > 0 ? tokens / seconds : null,
+    };
+  }
+  function sortScores(scores) {
+    const missingLast = (value, direction) => value === null ? -Infinity : value * direction;
+    const compareSpeed = (first, second) =>
+      missingLast(second.tokensPerSecond, 1) - missingLast(first.tokensPerSecond, 1);
+    return [...scores].sort((first, second) => {
+      if (viewState.sortKey === "speed") return compareSpeed(first, second);
+      if (viewState.sortKey === "duration") {
+        return first.run.durationSeconds - second.run.durationSeconds;
+      }
+      return missingLast(second.ratio, 1) - missingLast(first.ratio, 1)
+        || compareSpeed(first, second);
+    });
+  }
+
+  /* ── Kopf, KPI-Leiste, Filter ── */
+  function renderHeaderFigures(visibleRuns, sortedScores) {
+    const newest = allRuns.reduce((latest, run) =>
+      timestampValue(run.startedAt) > timestampValue(latest) ? run.startedAt : latest, "");
+    const standText = newest ? formatTimestamp(newest) : "–";
+    document.getElementById("stand-chip-value").textContent = standText;
+    const modelCount = new Set(visibleRuns.map(run => run.model)).size;
+    const bestScore = sortedScores.reduce((best, score) =>
+      score.ratio !== null && (best === null || score.ratio > best) ? score.ratio : best, null);
+    const bestLevel = determineScoreLevel(bestScore);
+    const figures = [
+      ["Stand", standText, "small"],
+      ["Läufe", visibleRuns.length + " von " + allRuns.length, ""],
+      ["Modelle", String(modelCount), ""],
+      ["Bester Score", bestScore === null ? "–" : Math.round(bestScore * 100) + " %",
+        bestLevel === "ok" ? "ok" : bestLevel === "mid" ? "warn" : bestLevel === "low"
+          ? "crit" : ""],
+    ];
+    replaceChildrenOf(document.getElementById("kpis"), figures.map(([label, value, tone]) =>
+      buildElement("div", { className: "kpi" }, [
+        buildElement("span", { className: "kpi-label", text: label }),
+        buildElement("span", { className: "kpi-val " + tone, text: value }),
+      ])));
+  }
+  function renderSuiteFilter() {
+    const allActive = viewState.activeSuites.size === suiteOrder.length;
+    const chips = [buildElement("button", {
+      type: "button", className: "chip plain", "aria-pressed": String(allActive),
+      text: "Alle", onclick: () => {
+        suiteOrder.forEach(suite => viewState.activeSuites.add(suite));
+        renderAll();
+      },
+    })];
+    suiteOrder.forEach(suite => chips.push(buildElement("button", {
+      type: "button", className: "chip", text: suite,
+      "aria-pressed": String(viewState.activeSuites.has(suite)),
+      onclick: () => {
+        if (viewState.activeSuites.has(suite)) {
+          if (viewState.activeSuites.size > 1) viewState.activeSuites.delete(suite);
+        } else {
+          viewState.activeSuites.add(suite);
+        }
+        renderAll();
+      },
+    })));
+    replaceChildrenOf(document.getElementById("suite-filter"), chips);
+  }
+  function renderSortControl() {
+    document.querySelectorAll("#sort-control .seg-btn").forEach(button => {
+      button.setAttribute("aria-pressed", String(button.dataset.sort === viewState.sortKey));
+    });
+    document.getElementById("latest-only")
+      .setAttribute("aria-pressed", String(viewState.latestOnly));
+  }
+
+  /* ── Rangliste ── */
+  function buildSuiteCells(score, suites) {
+    return buildElement("div", { className: "suite-cells" }, suites.map(suite => {
+      const counts = score.suiteCounts.get(suite);
+      let state = "absent", valueText = "·", description = "nicht im Lauf enthalten";
+      if (counts && counts.total) {
+        state = determineState(counts.passed, counts.total);
+        valueText = counts.passed + "/" + counts.total;
+        description = valueText + " bestanden";
+      } else if (counts) {
+        state = "skip";
+        valueText = "–";
+        description = "am Endpunkt nicht möglich";
+      }
+      return buildElement("span", {
+        className: "suite-cell state-" + state, "aria-label": suite + ": " + description,
+      }, [
+        buildElement("small", { text: suite, "aria-hidden": "true" }),
+        buildElement("b", { text: valueText, "aria-hidden": "true" }),
+      ]);
+    }));
+  }
+  function buildModelBlock(run) {
+    const nameParts = splitModelName(run.model);
+    return [
+      nameParts.prefix ? buildElement("span", { className: "model-prefix",
+        text: nameParts.prefix }) : null,
+      buildElement("span", { className: "model-name", text: nameParts.name }),
+      buildElement("div", { className: "model-meta" }, [
+        buildEndpointPill(run.endpoint),
+        buildThinkingPill(run.thinking),
+        buildElement("span", { className: "pill no-dot num",
+          text: run.repetitions + "× je Fall" }),
+        buildElement("span", { className: "pill no-dot num",
+          text: formatTimestamp(run.startedAt) }),
+      ]),
+    ];
+  }
+  function buildScoreBlock(score) {
+    const level = determineScoreLevel(score.ratio);
+    const percent = score.ratio === null ? 0 : score.ratio * 100;
+    const meterFill = buildElement("i");
+    meterFill.style.width = percent.toFixed(1) + "%";
+    const skippedCases = score.selectedCases - score.executedCases;
+    return [
+      buildElement("div", { className: "score-line" }, [
+        buildElement("span", { className: "score-value " + level,
+          text: score.ratio === null ? "–" : Math.round(percent) + " %" }),
+        buildElement("span", { className: "meter " + level, role: "img",
+          "aria-label": "Score-Balken " + Math.round(percent) + " Prozent" }, [meterFill]),
+      ]),
+      buildElement("div", { className: "score-detail", text: score.passed + "/" + score.total
+        + " Läufe bestanden" + (skippedCases ? " · " + skippedCases + " Fälle nicht möglich"
+          : "") }),
+    ];
+  }
+  function renderRanking(sortedScores) {
+    const suites = suiteOrder.filter(suite => viewState.activeSuites.has(suite));
+    const sortDirection = { score: "descending", speed: "descending", duration: "ascending" };
+    const sortableHead = (key, label, extraClass) => buildElement("th", {
+      scope: "col", className: extraClass || null,
+      "aria-sort": viewState.sortKey === key ? sortDirection[key] : null, text: label,
+    });
+    const head = buildElement("thead", {}, [buildElement("tr", {}, [
+      buildElement("th", { scope: "col", className: "rank-cell", text: "Platz" }),
+      buildElement("th", { scope: "col", text: "Modell" }),
+      sortableHead("score", "Score"),
+      buildElement("th", { scope: "col", text: "Suites (bestanden/ausgeführt)" }),
+      sortableHead("speed", "tok/s", "right"),
+      sortableHead("duration", "Dauer", "right"),
+    ])]);
+    const rows = sortedScores.map((score, index) => {
+      const rankClass = index === 0 ? "rank first" : "rank";
+      const run = score.run;
+      return buildElement("tr", {}, [
+        buildElement("td", { className: "rank-cell rank-cell-desktop" }, [
+          buildElement("span", { className: rankClass, text: String(index + 1) }),
+        ]),
+        buildElement("td", { className: "model-cell span-2 rank-model" }, [
+          buildElement("span", { className: rankClass + " rank-inline",
+            text: String(index + 1), "aria-label": "Platz " + (index + 1) }),
+          buildElement("div", {}, buildModelBlock(run)),
+        ]),
+        buildElement("td", { className: "span-2", "data-label": "Score" },
+          buildScoreBlock(score)),
+        buildElement("td", { className: "span-2", "data-label": "Suites" },
+          [buildSuiteCells(score, suites)]),
+        buildElement("td", { className: "num right", "data-label": "tok/s",
+          text: score.tokensPerSecond === null ? "–" : formatDecimal(score.tokensPerSecond, 1) }),
+        buildElement("td", { className: "num right", "data-label": "Dauer",
+          text: formatDuration(run.durationSeconds) }),
+      ]);
+    });
+    replaceChildrenOf(document.getElementById("ranking"),
+      [head, buildElement("tbody", {}, rows)]);
+  }
+
+  /* ── Matrix Testfall × Lauf ── */
+  function buildCellKey(runId, suite, caseName) {
+    return JSON.stringify([runId, suite, caseName]);
+  }
+  function findCase(run, suite, caseName) {
+    return run.cases.find(caseResult =>
+      caseResult.suite === suite && caseResult.caseName === caseName) || null;
+  }
+  function selectCell(cellKey) {
+    viewState.selectedCell = cellKey;
+    renderMatrixAndDetail(currentOrderedRuns);
+    const detail = document.getElementById("detail");
+    const rect = detail.getBoundingClientRect();
+    if (rect.top < 56 || rect.top > window.innerHeight - 80) {
+      detail.scrollIntoView({ block: "start",
+        behavior: reducedMotionQuery.matches ? "auto" : "smooth" });
+    }
+  }
+  function buildMatrixCell(run, suite, caseName, columnNumber) {
+    const caseResult = findCase(run, suite, caseName);
+    if (!caseResult) {
+      return buildElement("td", {}, [buildElement("span", {
+        className: "cell-btn state-absent", text: "·",
+        "aria-label": caseName + ", Lauf " + columnNumber + ": nicht im Lauf enthalten",
+      })]);
+    }
+    const state = determineState(caseResult.passedRuns, caseResult.runs);
+    const valueText = caseResult.runs ? caseResult.passedRuns + "/" + caseResult.runs : "–";
+    const cellKey = buildCellKey(run.runId, suite, caseName);
+    return buildElement("td", {}, [buildElement("button", {
+      type: "button", className: "cell-btn state-" + state, text: valueText,
+      "aria-pressed": String(viewState.selectedCell === cellKey),
+      "aria-controls": "detail",
+      "aria-label": caseName + ", Lauf " + columnNumber + ": "
+        + (caseResult.runs ? valueText + " " : "") + verdictLabels[state],
+      onclick: () => selectCell(cellKey),
+    })]);
+  }
+  function renderMatrix(orderedRuns) {
+    const headCells = [buildElement("th", { scope: "col", className: "case-col",
+      text: "Fall" })];
+    orderedRuns.forEach((run, index) => {
+      const nameParts = splitModelName(run.model);
+      headCells.push(buildElement("th", { scope: "col", className: "run-head" }, [
+        buildElement("span", { className: "run-rank", text: "#" + (index + 1) }),
+        buildElement("span", { className: "run-name", text: nameParts.name }),
+        buildElement("span", { className: "run-mode",
+          text: run.endpoint + " · " + describeThinking(run.thinking) }),
+      ]));
+    });
+    const bodyRows = [];
+    suiteOrder.filter(suite => viewState.activeSuites.has(suite)).forEach(suite => {
+      const caseNames = [];
+      allRuns.forEach(run => run.cases.forEach(caseResult => {
+        if (caseResult.suite === suite && !caseNames.includes(caseResult.caseName)
+          && orderedRuns.some(visible => findCase(visible, suite, caseResult.caseName))) {
+          caseNames.push(caseResult.caseName);
+        }
+      }));
+      if (!caseNames.length) return;
+      bodyRows.push(buildElement("tr", { className: "suite-row" }, [
+        buildElement("td", { colspan: String(orderedRuns.length + 1) }, [
+          buildElement("span", { className: "suite-row-label" }, [
+            buildElement("span", { className: "led led-acc", "aria-hidden": "true" }),
+            suite,
+          ]),
+        ]),
+      ]));
+      caseNames.forEach(caseName => {
+        bodyRows.push(buildElement("tr", {}, [
+          buildElement("th", { scope: "row", className: "case-col", text: caseName }),
+          ...orderedRuns.map((run, index) => buildMatrixCell(run, suite, caseName, index + 1)),
+        ]));
+      });
+    });
+    replaceChildrenOf(document.getElementById("matrix"), [
+      buildElement("thead", {}, [buildElement("tr", {}, headCells)]),
+      buildElement("tbody", {}, bodyRows),
+    ]);
+  }
+  function renderDetail(orderedRuns) {
+    const detailBody = document.getElementById("detail-body");
+    let selection = null;
+    if (viewState.selectedCell) {
+      const [runId, suite, caseName] = JSON.parse(viewState.selectedCell);
+      const columnIndex = orderedRuns.findIndex(run => run.runId === runId);
+      const run = orderedRuns[columnIndex];
+      const caseResult = run ? findCase(run, suite, caseName) : null;
+      if (caseResult && viewState.activeSuites.has(suite)) {
+        selection = { run, caseResult, columnIndex };
+      }
+    }
+    if (!selection) {
+      viewState.selectedCell = null;
+      replaceChildrenOf(detailBody, [buildElement("p", { className: "detail-empty",
+        text: "Zelle in der Matrix antippen: Hier erscheinen dann die Hinweise jeder "
+          + "Wiederholung, zum Beispiel die falsche Antwort oder das Fehlerbild." })]);
+      return;
+    }
+    const { run, caseResult, columnIndex } = selection;
+    const state = determineState(caseResult.passedRuns, caseResult.runs);
+    const resultText = caseResult.runs
+      ? caseResult.passedRuns + "/" + caseResult.runs + " " + verdictLabels[state]
+      : "– " + verdictLabels.skip + " (zählt nicht)";
+    const facts = [
+      ["Modell", run.model],
+      ["Lauf", "#" + (columnIndex + 1) + " · " + formatTimestamp(run.startedAt)],
+      ["Endpunkt", run.endpoint],
+      ["Denkmodus", describeThinking(run.thinking)],
+      ["Ergebnis", resultText],
+      ["Ø Zeit je Lauf", caseResult.runs ? formatDecimal(caseResult.averageSeconds, 2) + " s"
+        : "–"],
+      ["Tokens (Ausgabe)", String(caseResult.completionTokens)],
+    ];
+    const notes = caseResult.notes.length ? caseResult.notes : ["(kein Hinweis gespeichert)"];
+    replaceChildrenOf(detailBody, [
+      buildElement("div", { className: "detail-title" }, [
+        buildElement("span", { className: pillClassForState[state],
+          text: caseResult.runs ? verdictLabels[state] : "nicht möglich" }),
+        buildElement("h3", { text: caseResult.suite + " / " + caseResult.caseName }),
+      ]),
+      buildElement("dl", { className: "detail-grid" }, facts.map(([label, value]) =>
+        buildElement("div", {}, [
+          buildElement("dt", { text: label }),
+          buildElement("dd", { text: value }),
+        ]))),
+      buildElement("p", { className: "notes-title", text: "Hinweise je Wiederholung" }),
+      buildElement("ol", { className: "notes" }, notes.map((note, index) =>
+        buildElement("li", {}, [
+          buildElement("span", { className: "note-index", text: "#" + (index + 1) }),
+          buildElement("span", { className: "note-text", text: note }),
+        ]))),
+      buildElement("div", { className: "detail-actions" }, [buildElement("button", {
+        type: "button", className: "btn", text: "Auswahl aufheben",
+        onclick: () => { viewState.selectedCell = null; renderMatrixAndDetail(orderedRuns); },
+      })]),
+    ]);
+  }
+  function renderMatrixAndDetail(orderedRuns) {
+    renderDetail(orderedRuns);
+    renderMatrix(orderedRuns);
+  }
+
+  /* ── Gesamtaufbau ── */
+  let currentOrderedRuns = [];
+  function renderAll() {
+    renderSuiteFilter();
+    renderSortControl();
+    const visibleRuns = selectVisibleRuns();
+    const sortedScores = sortScores(visibleRuns.map(scoreRun));
+    renderHeaderFigures(visibleRuns, sortedScores);
+    const hasRuns = sortedScores.length > 0;
+    document.getElementById("empty-state").hidden = hasRuns;
+    document.getElementById("ranking-wrap").hidden = !hasRuns;
+    document.getElementById("matrix-card").hidden = !hasRuns;
+    if (!hasRuns) return;
+    renderRanking(sortedScores);
+    currentOrderedRuns = sortedScores.map(score => score.run);
+    renderMatrixAndDetail(currentOrderedRuns);
+  }
+
+  document.getElementById("latest-only").addEventListener("click", () => {
+    viewState.latestOnly = !viewState.latestOnly;
+    renderAll();
+  });
+  document.querySelectorAll("#sort-control .seg-btn").forEach(button => {
+    button.addEventListener("click", () => { viewState.sortKey = button.dataset.sort;
+      renderAll(); });
+  });
+  document.getElementById("theme-toggle").addEventListener("click", () => {
+    const root = document.documentElement;
+    const current = root.dataset.theme
+      || (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+    const next = current === "dark" ? "light" : "dark";
+    root.dataset.theme = next;
+    storeValue("ui-theme", next);
+    updateThemeButton();
+  });
+  function updateThemeButton() {
+    const root = document.documentElement;
+    const current = root.dataset.theme
+      || (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+    const button = document.getElementById("theme-toggle");
+    button.setAttribute("aria-label", current === "dark"
+      ? "Helles Design einschalten" : "Dunkles Design einschalten");
+    button.querySelector(".theme-label").textContent = current === "dark" ? "Hell" : "Dunkel";
+  }
+  updateThemeButton();
+  renderAll();
+})();
+</script>
+
+</body>
+</html>
